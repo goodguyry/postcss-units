@@ -8,7 +8,7 @@
   ],
   "scripts": {
     "report": "nyc report --reporter=html",
-    "test": "nyc ava test.js",
+    "test": "nyc ava --watch test.js",
     "posttest": "eslint *.js"
   },
   "repository": {
