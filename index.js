@@ -1,13 +1,12 @@
 'use strict';
 
-var extend = require('extend');
-var postcss = require('postcss');
-var valueParser = require('postcss-value-parser');
+const postcss = require('postcss');
+const valueParser = require('postcss-value-parser');
 
-var funcExp = /(em\(|rem\()/;
+const funcExp = /(em\(|rem\()/;
 
 function postcssUnits(options) {
-  options = extend({
+  options = Object.assign({
     size: 16,
     fallback: false,
     precision: 3
@@ -18,12 +17,12 @@ function postcssUnits(options) {
   }
 
   return function(css) {
-    css.walkDecls(function(decl) {
+    css.walkDecls((decl) => {
       if (!funcExp.test(decl.value)) {
         return;
       }
 
-      var parsedValue = valueParser(decl.value).walk(function(node) {
+      const parsedValue = valueParser(decl.value).walk((node) => {
         if (!isValidFunction(node)) {
           return;
         }
@@ -31,9 +30,11 @@ function postcssUnits(options) {
         node.type = 'word';
         const { nodes } = node;
 
+        // Filter out invalid values
         const filteredNodes = nodes.filter((item) =>
           isValidUnit(item) && item.type !== 'space');
 
+        // Conditionally collect fallback value(s)
         node.fallback = filteredNodes.reduce((acc, item) => {
           const { value: propValue } = item;
           const { value: units } = node;
@@ -51,6 +52,7 @@ function postcssUnits(options) {
         }, '')
           .trim();
 
+        // Collect node value(s)
         node.value = filteredNodes
           .map((item) => {
             const { value: propValue } = item;
@@ -62,34 +64,33 @@ function postcssUnits(options) {
             }
 
             const { number: value } = parsedPropValue;
+            const number = Number(value);
 
-            // Return if `auto`
+            // Do no process `auto`
             if (propValue === 'auto') {
               return `${propValue}`;
             }
 
-            // Return `0` value un-processed
-            if (Number(value) === 0) {
+            // Do not process `0`
+            if (number === 0) {
               return `${value}`;
             }
 
             // Return processed value(s)
-            return `${convert(Number(value), options)}${units}`.trim();
+            return `${convert(number, options)}${units}`.trim();
           })
           .reduce((acc, value) => `${acc} ${value}`)
           .trim();
       });
 
-
-      decl.value = parsedValue.toString().trim();
+      decl.value = parsedValue.toString();
 
       if (options.fallback) {
         decl.cloneBefore({
-          value: parsedValue.walk(function(node) {
-            if (node.fallback) {
-              node.value = node.fallback;
-            }
-          }).toString()
+          value: parsedValue.nodes
+            .filter((node) => node.type !== 'space')
+            .map((node) => node.fallback ? node.fallback : node.value, '')
+            .reduce((acc, value) => `${acc} ${value}`)
         });
       }
     });
@@ -97,17 +98,14 @@ function postcssUnits(options) {
 }
 
 function isValidFunction(node) {
-  var functions = {
-    em: true,
-    rem: true
-  };
   return node.type === 'function' &&
-    functions[node.value] &&
+    ['em', 'rem'].includes(node.value) &&
     node.nodes[0].type === 'word';
 }
 
 function isValidUnit(value) {
-  return !value.unit || value.unit === 'px';
+  const { unit } = value;
+  return !unit || unit === 'px';
 }
 
 function convert(number, options) {
@@ -121,8 +119,8 @@ function convert(number, options) {
  * @returns {number} final number
  */
 function numberAfterPoint(number, precision) {
-  var multiplier = Math.pow(10, precision + 1);
-  var fullNumber = Math.floor(number * multiplier);
+  const multiplier = Math.pow(10, precision + 1);
+  const fullNumber = Math.floor(number * multiplier);
   return Math.round(fullNumber / 10) * 10 / multiplier;
 }
 
